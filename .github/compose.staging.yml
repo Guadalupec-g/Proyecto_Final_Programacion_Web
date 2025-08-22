@@ -1,0 +1,46 @@
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data_ci:/var/lib/mysql
+      - ./InfoMundi/backend/crear_infomundi.sql:/docker-entrypoint-initdb.d/1_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -p$${MYSQL_ROOT_PASSWORD} || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD}@db:3306/${MYSQL_DATABASE}
+      ALLOWED_ORIGINS: http://localhost:8081,http://127.0.0.1:8081
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      FORCE_HTTPS: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  web:
+    image: nginx:alpine
+    depends_on:
+      - api
+    ports:
+      - "8081:8080"
+      - "8443:8443"
+    volumes:
+      - ./InfoMundi/frontend:/usr/share/nginx/html:ro
+      - ./.github/nginx.staging.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+
+volumes:
+  db_data_ci:
