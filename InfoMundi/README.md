@@ -1,373 +1,292 @@
-# InfoMundi – FastAPI + MySQL + ETL (pandas) + Prefect + Docker
+# InfoMundi 🌍 — FastAPI + MySQL + ETL + Prefect + Nginx (HTTPS)
 
-Proyecto web que expone un API con FastAPI, persiste datos en MySQL, ejecuta un pipeline ETL con pandas, lo orquesta con Prefect y sirve un frontend estático (HTML/CSS/JS). Incluye ejecución local y por Docker Compose.
+Explora países con una API pública, guarda favoritos y visualiza datos limpios generados por un pipeline ETL.
+**Stack:** FastAPI, SQLAlchemy/MySQL, pandas, Prefect 2.x, Docker Compose, Nginx (TLS local).
 
-# Objetivos del entregable
+---
 
-- Backend con FastAPI (CRUD y endpoints de negocio).
+## Tabla de contenido
 
-- Persistencia en MySQL con SQLAlchemy y script inicial.
+* [Características](#características)
+* [Estructura del repositorio](#estructura-del-repositorio)
+* [Requisitos](#requisitos)
+* [Variables de entorno](#variables-de-entorno)
+* [Inicio rápido](#inicio-rápido)
 
-- ETL con pandas que genera respaldos (CSV y JSON).
+  * [Opción A: Docker Compose](#opción-a--docker-compose)
+  * [Opción B: API local + DB en contenedor](#opción-b--api-local--db-en-contenedor)
+* [Probar la API y el ETL](#probar-la-api-y-el-etl)
+* [Orquestación con Prefect 2.x](#orquestación-con-prefect-2x)
+* [Nginx + HTTPS + Seguridad](#nginx--https--seguridad)
+* [CI (demo) con GitHub Actions](#ci-demo-con-github-actions)
+* [Comandos útiles](#comandos-útiles)
+* [Troubleshooting](#troubleshooting)
+* [Notas](#notas)
 
-- Orquestación con Prefect (deployment y schedule).
+---
 
-- Frontend consumiendo el API.
+## Características
 
-- Contenerización con Docker Compose (db + api + web).
+* **API pública:** `restcountries.com` para búsqueda por nombre.
+* **Backend:** FastAPI + SQLAlchemy (endpoints CRUD de favoritos + endpoints ETL).
+* **Base de datos:** MySQL 8 en contenedor.
+* **ETL:** Limpia `raw_data` → `cleaned_data`, genera backups (CSV) y logs (JSON).
+* **Orquestación:** Prefect 2.x (flow, work pool y UI).
+* **Frontend estático:** HTML/CSS/JS (modo oscuro, UI simple).
+* **Reverse proxy:** Nginx con HTTPS local (certificado autofirmado) y headers de seguridad (CSP incluida).
+* **CI (demo):** GitHub Actions (lint + levantar staging con docker compose y health-check).
 
-- Documentación clara de instalación, ejecución y troubleshooting.
+---
 
-# Tecnologías
+## Estructura del repositorio
 
-- Backend: FastAPI, SQLAlchemy, Uvicorn
-
-- Base de datos: MySQL 8
-
-- ETL: pandas
-
-- Orquestación: Prefect 3
-
-- Frontend: HTML, CSS, JavaScript
-
-- Contenedores: Docker y Docker Compose
-
-- Otros: python-dotenv, APScheduler (opcional)
-
-# Estructura del proyecto
-
-proyecto_final_programacion_web/
+```
+.
+├─ .github/workflows/ci-cd.yml     # Pipeline CI (demo)
 ├─ InfoMundi/
 │  ├─ backend/
-│  │  ├─ main.py               # FastAPI: endpoints, CORS, startup (espera DB)
-│  │  ├─ models.py             # Modelos SQLAlchemy
-│  │  ├─ database.py           # Engine/Session + .env
-│  │  ├─ etl_pipeline.py       # run_etl(): lectura, limpieza, respaldos
-│  │  ├─ crear_infomundi.sql   # Script SQL de creación inicial
-│  │  └─ backups/              # raw_backup_*.csv, cleaned_backup_*.csv, etl_log_*.json
-│  ├─ frontend/
-│  │  ├─ index.html
-│  │  ├─ styles.css
-│  │  └─ script.js             # fetch al API
-│  └─ requirements.txt
+│  │  ├─ main.py                   # FastAPI app (CORS, seguridad, scheduler ETL)
+│  │  ├─ etl_pipeline.py           # Lógica ETL (pandas)
+│  │  ├─ database.py               # Conexión SQLAlchemy (DATABASE_URL)
+│  │  ├─ models.py                 # Modelos/ORM
+│  │  └─ crear_infomundi.sql       # Esquema inicial (tablas raw/cleaned/favoritos)
+│  └─ frontend/
+│     ├─ index.html                # Frontend estático
+│     ├─ styles.css
+│     └─ script.js
 ├─ pipeline/
-│  └─ prefect_flow.py          # Flow: etl_flow (llama backend.etl_pipeline.run_etl)
-├─ docker-compose.yml          # db + api + web (nginx)
-├─ Dockerfile                  # imagen del servicio api
-├─ .env                        # variables (no subir al repo)
-└─ README.md
+│  └─ prefect_flow.py              # Flow Prefect (importa y ejecuta run_etl)
+├─ docker-compose.yml              # Servicios: db + api + nginx
+├─ nginx.conf                      # HTTPS + headers seguros + proxy /api
+├─ Dockerfile                      # Imagen de la API
+├─ requirements.txt                # Dependencias (API/ETL/Prefect)
+├─ .env.example                    # Variables ejemplo (no subas .env real)
+└─ certs/                          # (local) Llaves TLS autofirmadas (gitignored)
+```
 
-# Variables de entorno
+---
 
-Cree un archivo .env en la raíz (junto a docker-compose.yml). No lo suba al repositorio.
+## Requisitos
 
-# Para Docker
-MYSQL_ROOT_PASSWORD=<TU_PASSWORD>
+* Docker y Docker Compose (para la opción A).
+* Python 3.10+ y `venv` (solo si usarás la opción B).
+* OpenSSL (para generar el certificado local).
+
+---
+
+## Variables de entorno
+
+Crea un archivo `.env` en la **raíz** (NO lo subas a Git). Puedes basarte en `.env.example`:
+
+```bash
+# DB
+MYSQL_ROOT_PASSWORD=LupeSecure_2025
 MYSQL_DATABASE=infomundiF
-ALLOWED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
 
-# Para correr local (sin Docker)
-DATABASE_URL=mysql+pymysql://root:<TU_PASSWORD>@localhost:3306/infomundiF
+# API
+ALLOWED_ORIGINS=http://localhost:8081,https://localhost:8443,http://127.0.0.1:5500
+ALLOWED_HOSTS=localhost,127.0.0.1
+FORCE_HTTPS=false
+```
 
+**Nota:** `.env` está en `.gitignore`. Las credenciales no se subirán al repo.
 
-# Notas:
+---
 
-El backend lee DATABASE_URL desde .env en local y desde variables del compose en contenedor.
+## Inicio rápido
 
-Si su contraseña contiene caracteres especiales (@ : / # % & +), codifíquelos en la URL (ej.: @ → %40, ! → %21).
+### Opción A — Docker Compose
 
-Ejecución local (sin Docker)
+1. Generar certificados locales (una sola vez):
 
-Crear entorno virtual e instalar dependencias:
+```bash
+mkdir -p certs
+openssl req -x509 -newkey rsa:2048 -nodes \
+  -keyout certs/privkey.key -out certs/fullchain.crt \
+  -days 365 -subj "/CN=localhost"
+```
 
-python -m venv venv
-source venv/bin/activate
-pip install -r InfoMundi/requirements.txt
+2. Levantar toda la stack:
 
-
-Asegurar MySQL y la BD infomundiF. Para inicializar desde SQL:
-
-mysql -uroot -p < InfoMundi/backend/crear_infomundi.sql
-
-# -----------------------------------------------------------
-
-# Levantar el backend:
-
-cd InfoMundi
-uvicorn backend.main:app --reload
-# Swagger: http://127.0.0.1:8000/docs
-
-
-# Frontend (dos alternativas):
-
-Live Server (VSCode): abrir
-http://127.0.0.1:5500/InfoMundi/frontend/index.html
-
-Servir desde FastAPI (opcional, agregar a backend/main.py):
-
-from fastapi.staticfiles import StaticFiles
-from starlette.responses import FileResponse
-from pathlib import Path
-
-BASE_DIR = Path(__file__).resolve().parents[1]
-FRONTEND_DIR = BASE_DIR / "frontend"
-app.mount("/frontend", StaticFiles(directory=str(FRONTEND_DIR)), name="frontend")
-
-@app.get("/", include_in_schema=False)
-def home():
-    return FileResponse(str(FRONTEND_DIR / "index.html"))
-
-
-Luego abrir http://127.0.0.1:8000/.
-
-# Notas:
-
-Para Live Server, considere añadir http://127.0.0.1:5500 a ALLOWED_ORIGINS en .env si usa CORS restringido.
-
-Si desea que / redirija a Swagger, agregue:
-
-from starlette.responses import RedirectResponse
-@app.get("/", include_in_schema=False)
-def root():
-    return RedirectResponse(url="/docs")
-
-# Ejecución con Docker Compose
-
-Recomendado para la demo final (sirve también el frontend por Nginx en 8080).
-
-Verifique .env (arriba).
-
-docker-compose.yml con healthcheck y dependencia de DB:
-
-services:
-  db:
-    image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-infomundiF}
-    ports:
-      - "3306:3306"          # si choca con MySQL local: "3307:3306"
-    volumes:
-      - db_data:/var/lib/mysql
-      - ./InfoMundi/backend/crear_infomundi.sql:/docker-entrypoint-initdb.d/1_schema.sql
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -p$${MYSQL_ROOT_PASSWORD} || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 30
-
-  api:
-    build: .
-    environment:
-      DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD:-root}@db:3306/${MYSQL_DATABASE:-infomundiF}
-      ALLOWED_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
-    depends_on:
-      db:
-        condition: service_healthy
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./InfoMundi/backend/backups:/app/InfoMundi/backend/backups
-
-  web:
-    image: nginx:alpine
-    ports:
-      - "8080:80"
-    volumes:
-      - ./InfoMundi/frontend:/usr/share/nginx/html:ro
-
-volumes:
-  db_data:
-
-
-# Levantar limpio y construir:
-
-docker compose down -v
+```bash
 docker compose up --build
+```
 
+3. Abrir el sitio:
 
-# Probar:
+* Frontend (por Nginx con HTTPS): `https://localhost:8443`
+  Acepta el aviso del certificado autofirmado.
+* API directa (FastAPI): `http://localhost:8000`
+* MySQL (host): `127.0.0.1:3307` (user: `root`, pass: `${MYSQL_ROOT_PASSWORD}`)
 
-API: http://localhost:8000/docs
+> Si `8080` estaba ocupado, el compose ya mapea `8081:8080` y `8443:8443`.
 
-Frontend: http://localhost:8080
+---
 
-# Notas:
+### Opción B — API local (sin Docker) usando la DB del contenedor
 
-El backend incluye una espera en startup que verifica la DB con pings antes de exponer el API.
+1. Deja corriendo **solo** la base de datos (o todo el compose).
+2. Crea un entorno virtual e instala dependencias:
 
-Si el puerto 3306 está ocupado por un MySQL local, cambie a 3307:3306 en db.ports. Dentro de Docker, el API sigue usando db:3306.
+```bash
+python -m venv venv
+source venv/bin/activate           # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-Orquestación con Prefect (flow, deployment y schedule)
+3. Exporta la URL a la DB del contenedor (puerto 3307 del host):
 
-El ETL también se puede programar con Prefect.
+```bash
+export DATABASE_URL="mysql+pymysql://root:${MYSQL_ROOT_PASSWORD:-root}@127.0.0.1:3307/${MYSQL_DATABASE:-infomundiF}"
+```
 
-Configurar el CLI para la UI local:
+4. Corre FastAPI:
 
-prefect config set PREFECT_API_URL=http://127.0.0.1:4200/api
+```bash
+uvicorn InfoMundi.backend.main:app --reload --host 0.0.0.0 --port 8000
+```
 
+Frontend: abre `InfoMundi/frontend/index.html` con Live Server o usa el Nginx del compose.
 
-Iniciar servidor/UI en una terminal:
+---
 
-prefect server start
-# UI: http://127.0.0.1:4200
+## Probar la API y el ETL
 
+**Endpoints clave**
 
-En otra terminal (con venv) y desde la raíz:
+* `GET /favoritos`
+* `POST /favoritos` (body: `{"nombre":"Canada","comentario":"Me gusta","imagen_url":"https://..."}`)
+* `POST /api/pipeline/run` → ejecuta ETL ahora
+* `GET /api/cleaned_data` → datos limpios
 
-export PYTHONPATH=.
-prefect work-pool create -t process infomundi-pool
+**Pruebas rápidas (curl)**
 
-prefect deploy pipeline/prefect_flow.py:etl_flow \
-  -n infomundi-deployment \
-  --cron "*/5 * * * *" \
-  -p infomundi-pool \
-  -q default
-
-# Si pregunta por almacenamiento remoto del código, responda: n
-
-
-# Iniciar el worker:
-
-export PYTHONPATH=.
-prefect worker start -p infomundi-pool
-
-
-Ejecutar manualmente (opcional):
-
-prefect deployment run "infomundi-etl/infomundi-deployment"
-
-
-Ver corridas en la UI (Runs). Los archivos de respaldo se guardan en InfoMundi/backend/backups/.
-
-# Endpoints principales
-
-GET /favoritos – lista favoritos
-
-POST /favoritos – crea favorito
-
-{
-  "nombre": "Costa Rica",
-  "comentario": "Me gusta",
-  "imagen_url": "https://example.com/bandera.png"
-}
-
-
-GET /favoritos/{id} – obtiene por id
-
-PUT /favoritos/{id} – actualiza
-
-DELETE /favoritos/{id} – elimina
-
-POST /api/pipeline/run – ejecuta ETL manualmente
-
-GET /api/cleaned_data – devuelve datos limpios (para tabla del front)
-
-# Documentación interactiva: /docs (Swagger) y /redoc.
-
-# Frontend
-
-Docker: http://localhost:8080
-
-Local con Live Server: http://127.0.0.1:5500/InfoMundi/frontend/index.html
-
-Asegúrese de que script.js apunte al host correcto del API (por ejemplo, http://localhost:8000).
-
-# ETL y respaldos
-
-run_etl() en backend/etl_pipeline.py:
-
-Lee datos “raw” desde la base de datos (consulta SQL).
-
-Aplica limpieza y normalización con pandas.
-
-Genera respaldos en backend/backups/:
-
-raw_backup_YYYYMMDD_HHMMSS.csv
-
-cleaned_backup_YYYYMMDD_HHMMSS.csv
-
-etl_log_YYYYMMDD_HHMMSS.json (métricas de ejecución)
-
-# Se ejecuta:
-
-Manualmente: POST /api/pipeline/run
-
-Programado: con Prefect según el cron del deployment.
-
-Pruebas rápidas (curl)
-# crear
-curl -X POST http://localhost:8000/favoritos \
-  -H "Content-Type: application/json" \
-  -d '{"nombre":"CR","comentario":"Me gusta","imagen_url":"https://ejemplo/img.png"}'
-
-# listar
-curl http://localhost:8000/favoritos
-
-# correr ETL
+```bash
+# Ejecutar ETL manualmente
 curl -X POST http://localhost:8000/api/pipeline/run
 
-# datos limpios
+# Ver tabla cleaned_data
 curl http://localhost:8000/api/cleaned_data
 
-# Solución de problemas
+# Crear un favorito
+curl -X POST http://localhost:8000/favoritos \
+  -H "Content-Type: application/json" \
+  -d '{"nombre":"Canada","comentario":"Me gusta","imagen_url":"https://flagcdn.com/w320/ca.png"}'
 
-Puerto 8000 en uso (Address already in use)
-Cierre Uvicorn local si usa Docker, o lance en otro puerto:
+# Listar favoritos
+curl http://localhost:8000/favoritos
+```
 
-uvicorn backend.main:app --reload --port 8001
+El ETL también corre automáticamente cada 5 min (APScheduler en `main.py`).
 
+---
 
-Para cerrar procesos en macOS:
+## Orquestación con Prefect 2.x
 
-lsof -ti tcp:8000 | xargs kill -9
+`pipeline/prefect_flow.py` importa `run_etl()` y lo expone como `etl_flow`.
 
+### A) UI/servidor local de Prefect
 
-Frontend 8080 no carga (ERR_CONNECTION_REFUSED)
-Asegure docker compose up en ejecución (servicio web encendido).
+En otra terminal:
 
-CORS desde 8080 o 5500
-Agregue orígenes en .env:
+```bash
+# 1) Iniciar servidor + UI (http://127.0.0.1:4200)
+prefect server start
 
-ALLOWED_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://127.0.0.1:5500
+# 2) (Opcional) apuntar el cliente al server local
+prefect config set PREFECT_API_URL="http://127.0.0.1:4200/api"
 
+# 3) Crear un Work Pool (tipo "process")
+prefect work-pool create infomundi-pool --type process
 
-API se cae al arrancar con Docker (DB no lista)
-Este compose incluye healthcheck y el backend espera a la DB en startup. Si modificó algo y vuelve a suceder:
+# 4) Iniciar un worker escuchando ese pool
+prefect worker start --pool infomundi-pool
 
-docker compose logs -f db
+# 5) Ejecutar el flow ad-hoc
+python pipeline/prefect_flow.py
+```
+
+Visualiza el run: `http://127.0.0.1:4200/runs`.
+
+### B) (Opcional) Deployment con schedule
+
+```bash
+prefect deployment build pipeline/prefect_flow.py:etl_flow \
+  -n infomundi-deployment -p infomundi-pool -q default \
+  -o pipeline/deployment.yaml --cron "*/5 * * * *"
+
+prefect deployment apply pipeline/deployment.yaml
+```
+
+---
+
+## Nginx + HTTPS + Seguridad
+
+* Redirección `http://localhost:8081` → `https://localhost:8443`.
+* Headers activos: **HSTS**, **X-Frame-Options**, **X-Content-Type-Options**, **Referrer-Policy**, **Permissions-Policy**.
+* **CSP** (Content-Security-Policy) restrictiva; permite únicamente:
+
+  * Recursos propios (`'self'`)
+  * `restcountries.com` para fetch
+  * Imágenes `https` + `flagcdn.com`
+* Proxy `/api` → `api:8000` (servicio FastAPI del compose).
+
+> Si cambias dominios/puertos, ajusta la **CSP** en `nginx.conf` y `ALLOWED_ORIGINS` en `.env`.
+
+---
+
+## CI (demo) con GitHub Actions
+
+Ubicación: `.github/workflows/ci-cd.yml`
+
+Incluye:
+
+* `flake8` (lint).
+* Levanta staging local con `docker compose` y valida que `/api/cleaned_data` responde.
+* No publica imágenes a DockerHub (no es necesario para la demo).
+
+---
+
+## Comandos útiles
+
+```bash
+# Logs de la API (compose)
 docker compose logs -f api
 
+# Reconstruir todo
+docker compose down
+docker compose up --build
 
-MySQL local ocupando 3306
-Cambie mapeo a 3307:3306 en db.ports. Dentro de Docker, el API usa db:3306 y no requiere cambios.
+# Acceder a MySQL del contenedor desde el host
+mysql -h 127.0.0.1 -P 3307 -u root -p
+USE infomundiF;
+SHOW TABLES;
 
-# Checklist de cumplimiento
+# Ver backups generados por el ETL (mapeados al host)
+ls -l InfoMundi/backend/backups
+```
 
-Repositorio con frontend/, backend/, pipeline/ y script SQL.
+---
 
-.env presente localmente y excluido por .gitignore.
+## Troubleshooting
 
-FastAPI con CRUD de favoritos y endpoints de negocio.
+* **Puertos 8443/8081 ocupados:** edita los mapeos en `docker-compose.yml`.
+* **Navegador “inseguro”:** el certificado es autofirmado; usa *Advanced → Proceed*.
+* **Swagger “Invalid host header”:** mitigado por proxy Nginx.
+* **Prefect “connection refused”:** corre `prefect server start` y verifica `PREFECT_API_URL=http://127.0.0.1:4200/api`.
+* **CORS desde Live Server:** usa `https://localhost:8443` (Nginx). `script.js` consume `/api/...` y el proxy resuelve.
+* **Errores de conexión a MySQL:** confirma `DATABASE_URL`, el puerto `3307` y que el contenedor `db` esté *healthy*.
+* **`docker compose up` falla en Apple Silicon:** asegúrate de usar imágenes multi-arch o habilita `platform: linux/amd64` si alguna dependencia lo requiere.
 
-MySQL con SQLAlchemy y script de creación inicial.
+---
 
-ETL en pandas con respaldos CSV/JSON periódicos o manuales.
+## Notas
 
-Prefect: flow, deployment y schedule activo; worker corriendo.
+* Este repositorio está pensado para **demo local**. No incluye hardening para producción ni despliegues remotos.
+* Si deseas exponerlo públicamente, considera:
 
-Frontend consumiendo el API.
-
-Docker Compose con db + api + web, healthcheck y dependencias.
-
-Documentación de instalación, ejecución y troubleshooting.
-
-# Requisitos y versiones
-
-Python 3.12
-
-Docker Desktop (recomendado)
-
-Prefect 3.x (CLI)
-
-MySQL 8 (si corre sin Docker)
+  * Renovación de certificados (no autofirmados).
+  * Rotación de secretos y almacenes seguros.
+  * Reverse proxy y WAF gestionados.
+  * Observabilidad (logs, métricas y trazas).
+  * Backups externos y política de retención.
