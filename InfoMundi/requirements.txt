@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+sqlalchemy
+mysql-connector-python
+pymysql
+pandas
+apscheduler
+prefect
+python-dotenv

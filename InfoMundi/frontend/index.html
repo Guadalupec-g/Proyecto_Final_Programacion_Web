@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>InfoMundi 🌍</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Header / Hero -->
+  <header class="hero">
+    <div class="container hero__inner">
+      <div class="hero__text">
+        <h1 class="brand">InfoMundi <span>🌍</span></h1>
+        <p class="subtitle">Explora países, guarda tus favoritos y mira los datos limpios de tu pipeline ETL.</p>
+
+        <div class="searchbar">
+          <input id="input-pais" type="text" placeholder="Buscar país por nombre…" />
+          <button class="btn btn--primary" onclick="buscarPais()">Buscar</button>
+        </div>
+        <small class="hint">Tip: prueba con <em>canada</em>, <em>germany</em>, <em>japan</em>…</small>
+      </div>
+
+      <div class="hero__art">
+        <div class="blob"></div>
+        <div class="badge">FastAPI + MySQL</div>
+        <div class="badge badge--outline">ETL con pandas</div>
+
+        <!-- Toggle modo oscuro/claro -->
+        <button id="themeToggle" class="btn btn--ghost theme-toggle" title="Cambiar tema">🌙</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Resultados de búsqueda -->
+    <section class="section">
+      <h2 class="section__title">Resultados</h2>
+      <div id="resultados" class="grid"></div>
+    </section>
+
+    <!-- Favoritos -->
+    <section class="section">
+      <div class="section__title-row">
+        <h2 class="section__title">⭐ Favoritos guardados</h2>
+        <a class="link" href="/docs" target="_blank" rel="noopener">Ver API Docs</a>
+      </div>
+      <div id="favoritos" class="grid"></div>
+    </section>
+
+    <!-- Datos limpios (ETL) -->
+    <section class="section">
+      <h2 class="section__title">📊 Datos limpios (pipeline ETL)</h2>
+
+      <div class="card card--table">
+        <div class="table-responsive">
+          <table id="cleanedTable" class="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>País</th>
+                <th>Fecha</th>
+                <th>Valor</th>
+                <th>Fuente</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="card__footer">
+          <button class="btn btn--ghost" onclick="cargarDatosLimpios()">Actualizar</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer__inner">
+      <p>Proyecto con <strong>FastAPI</strong>, <strong>MySQL</strong>, <strong>Prefect</strong> y <strong>Docker</strong>.</p>
+      <p class="muted">Front servido por Nginx con HTTPS local.</p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

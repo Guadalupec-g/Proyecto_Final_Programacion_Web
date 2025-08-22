@@ -1,0 +1,20 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Backups/artefactos
+InfoMundi/backend/backups/
+backups/
+
+# Certificados y secretos locales
+certs/
+.env
+*.pem
+*.crt
+*.key
+
+# Varias
+*.sqlite
+.DS_Store
+.prefect/

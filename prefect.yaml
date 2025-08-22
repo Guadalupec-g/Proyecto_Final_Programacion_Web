@@ -1,0 +1,37 @@
+# Welcome to your prefect.yaml file! You can use this file for storing and managing
+# configuration for deploying your flows. We recommend committing this file to source
+# control along with your flow code.
+
+# Generic metadata about this project
+name: proyecto_final_programacion_web
+prefect-version: 3.4.13
+
+# build section allows you to manage and build docker images
+build: null
+
+# push section allows you to manage if and how this project is uploaded to remote locations
+push: null
+
+# pull section allows you to provide instructions for cloning this project in remote locations
+pull:
+- prefect.deployments.steps.set_working_directory:
+    directory: /Users/guadalupegarcia/proyecto_final_programacion_web
+
+# the deployments section allows you to provide configuration for deploying flows
+deployments:
+- name: infomundi-deployment
+  version: null
+  tags: []
+  concurrency_limit: null
+  description: null
+  entrypoint: pipeline/prefect_flow.py:etl_flow
+  parameters: {}
+  work_pool:
+    name: infomundi-pool
+    work_queue_name: default
+    job_variables: {}
+  schedules:
+  - cron: '*/5 * * * *'
+    timezone: null
+    day_or: true
+    active: true
